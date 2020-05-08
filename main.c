@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include "ssu_mntr.h"
 
 int main(int argc,char *argv[]){//메인함수

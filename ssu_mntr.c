@@ -32,7 +32,7 @@ typedef struct f_changefile{
 }f_changefile;
 
 f_changefile f_change[BUFFER_SIZE];
-
+void write_log(int num);
 int w_createlist(f_tree *tree,int state,int index);
 void initstat(f_tree *cur);
 void sort_list(int num);
@@ -41,25 +41,26 @@ void compare_tree(f_tree *cur,f_tree *prev);
 int compare_node(f_tree *cur,f_tree *prev);
 void print_usage(void);
 void prompt(char *);
+
+char log_path[BUFFER_SIZE];//log.txt의 절대경로
+char check_path[BUFFER_SIZE];//check디렉토리의 절대경로
+
 void ssu_mntr(int argc,char *argv[]);
 f_tree * make_tree(char *path);//학번디렉토리안의 파일들을 트리화하는 함수
-int main(int argc,char *argv[]){
-	ssu_mntr(argc,argv);
-	prompt(argv[1]);
-	exit(0);
-}
 void ssu_mntr(int argc,char *argv[]){
 	FILE *fp;
 	char pwd[BUFFER_SIZE];
-	char log_path[BUFFER_SIZE];//log.txt의 절대경로
-	char std_path[BUFFER_SIZE];//학번 디렉토리의 절대경로
+	//char log_path[BUFFER_SIZE];//log.txt의 절대경로
+
 	getcwd(pwd,BUFFER_SIZE);//현재위치
-	printf("%s\n",pwd);
-	if(access("20182611",F_OK)!=0){//학번디렉토리의 존재여부 확인
+//printf("%s\n",pwd);
+	if(access("check",F_OK)!=0){//학번디렉토리의 존재여부 확인
 		fprintf(stderr,"no directory\n");
 		exit(1);//없으면 에러
 	}
-	sprintf(log_path,"%s/%s/%s",pwd,"20182611","log.txt");
+	//printf("%s",pwd);
+	sprintf(log_path,"%s/%s",pwd,"log.txt");
+	sprintf(check_path,"%s/%s",pwd,"check");//
 	//printf("%s\n",log_path);
 	//변경사항을 저장할 log.txt파일을 오픈(없으면 생성)
 	if((fp=fopen(log_path,"w+"))==NULL){
@@ -67,14 +68,13 @@ void ssu_mntr(int argc,char *argv[]){
 		exit(1);
 	}
 	fclose(fp);
-	sprintf(std_path,"%s/%s",pwd,"20182611");//파일의 절대경로 mntr_path에 저장
+
 	int isfirst=1;
 	int num;
 	f_tree *prev_tree;
 	f_tree *cur_tree;
-	//printf("stddir : %s\n",std_path);
 	while(1){
-		cur_tree=make_tree(std_path);
+		cur_tree=make_tree(check_path);//check디렉토리에 대한 트리 생성
 		initstat(cur_tree);//state초기화
 		
 		//첫번째 실행인 경우 새롭게 만든 cur_tree를 기존 트리로 설정
@@ -83,16 +83,60 @@ void ssu_mntr(int argc,char *argv[]){
 			isfirst=0;
 			continue;
 		}
-		compare_tree(cur_tree,prev_tree);//기존, 현재 트리를 비교
-		num=w_createlist(cur_tree,DELETE,0);//f_change 구조체를 채우는 함수(DELETE,CREATE 따로 생성 후 log.txt에 한번에 시간순으로 정렬해서 넣을것임)
-		num=w_createlist(cur_tree,CREATE,num);
-		
+		compare_tree(cur_tree->child,prev_tree->child);//기존, 현재 트리를 비교
+		num=w_createlist(cur_tree->child,DELETE,0);//f_change 구조체를 채우는 함수(DELETE,CREATE 따로 생성 후 log.txt에 한번에 시간순으로 정렬해서 넣을것임)
+		printf("num : %d\n",num);
+		num=w_createlist(cur_tree->child,CREATE,num);
+		printf("num : %d\n",num);
 		sort_list(num);//구조체 시간순 정렬
-		printf("%d",num);
+		write_log(num);
 		for(int i=0;i<num;i++)
 			printf("f_change[%d]=%d,%s\n",i,f_change[i].state,f_change[i].fname);
-		break;
+//		break;
+		//로그에 기록을 끝낸상태
+		//new_tree를 prev_tree로 옮겨주는 작업수행 (계속 트리를 갱신해주기 위해 필요)
+		//init_tree(prev_tree);
+		prev_tree=cur_tree;
+		
+		sleep(1);
 	}
+}
+void write_log(int num){
+	char *tmp,fname[BUFFER_SIZE];
+	
+	char timeform[BUFFER_SIZE];
+	char logform[BUFFER_SIZE];
+	FILE *fp;
+	struct tm t;
+	if((fp=fopen(log_path,"r+"))<0){//log.txt파일 오픈(읽기+쓰기)
+		fprintf(stderr,"file open error\n");
+		exit(1);
+	}//파일 오픈 에러처리
+	fseek(fp,0,SEEK_END);//오프셋을 맨 뒤로 설정
+	for(int i=0;i<num;i++){
+		tmp=strstr(f_change[i].fname,"check/");//check디렉토리 안 파일을 받아와서 tmp에 저장
+		tmp+=6;//check/뒤의 파일이름을 가리키도록 함
+		strcpy(fname,tmp);//순수 파일이름만을 fname에 집어넣음
+		//printf("%s\n",fname);
+		t=*localtime(&f_change[i].time);
+		sprintf(timeform,"%.4d-%02d-%02d %02d:%02d:%02d",t.tm_year+1900,t.tm_mon+1,t.tm_mday,t.tm_hour,t.tm_min,t.tm_sec);
+		//printf("%s\n",timeform);
+		
+		switch(f_change[i].state){
+			case MODIFY : 
+
+				fprintf(fp,"[%s][%s_%s]\n",timeform,"modify",fname);
+				break;
+			case CREATE:
+				fprintf(fp,"[%s][%s_%s]\n",timeform,"create",fname);
+				break;
+			case DELETE : 
+				fprintf(fp,"[%s][%s_%s]\n",timeform,"delete",fname);
+				break;
+		}		
+		
+	}
+	fclose(fp);
 }
 void sort_list(int num){//f_change 구조체를 시간순으로 정렬해주는 함수
 	f_changefile tmp;
@@ -121,36 +165,40 @@ void initstat(f_tree *cur){//파일구조체의 state를 초기화해주는 함�
 	}
 }
 int w_createlist(f_tree *tree,int state,int index){//파일상태변경여부를 구조체에 저장
+	//f_tree *stree;
+	//stree=tree;
 	while(1){
-	//printf("%d",tree->state);
-	if(tree->state==MODIFY){//MODIFY상태인경우(파일이 수정된 경우)
-		strcpy(f_change->fname,tree->fname);
-		f_change[index].time=tree->statbuf.st_mtime;
-		f_change[index].state=MODIFY;
-		index++;
-		break;
-	}
-	else if(tree->state==N){
-		if(state==CREATE){//CREATE인 경우 구조체의 시간을 수정시간으로 저장
-			strcpy(f_change->fname,tree->fname);
+		//printf("%d",tree->state);
+		if(tree->state==MODIFY){//MODIFY상태인경우(파일이 수정된 경우)
+			strcpy(f_change[index].fname,tree->fname);
 			f_change[index].time=tree->statbuf.st_mtime;
-			f_change[index].state=CREATE;
+			f_change[index].state=MODIFY;
+			index++;
 			break;
 		}
-		if(state==DELETE){//DELETE상태인경우 구조체에서 시간을 0으로 설정(나머지는 동일)
-			strcpy(f_change->fname,tree->fname);
-			f_change[index].time=time(NULL);
-			f_change[index].state=DELETE;
-			break;
+		else if(tree->state==N){
+			if(state==CREATE){//CREATE인 경우 구조체의 시간을 수정시간으로 저장
+				strcpy(f_change[index].fname,tree->fname);
+				f_change[index].time=tree->statbuf.st_mtime;
+				f_change[index].state=CREATE;
+				index++;
+				break;
+			}
+			if(state==DELETE){//DELETE상태인경우 구조체에서 시간을 0으로 설정(나머지는 동일)
+				strcpy(f_change[index].fname,tree->fname);
+				f_change[index].time=time(NULL);
+				f_change[index].state=DELETE;
+				index++;
+				break;
+			}
 		}
-	}
-	if(S_ISDIR(tree->statbuf.st_mode))
-		if(tree->child !=NULL)
-			index=w_createlist(tree->child,state,index);
-	if(tree->sibling !=NULL)
-		tree=tree->sibling;
-	else
-		break;
+		if(S_ISDIR(tree->statbuf.st_mode))
+			if(tree->child !=NULL)
+				index=w_createlist(tree->child,state,index);
+		if(tree->sibling !=NULL)
+			tree=tree->sibling;
+		else
+			break;
 	}
 	return index;
 		
@@ -160,6 +208,7 @@ int w_createlist(f_tree *tree,int state,int index){//파일상태변경여부를
 		
 	}*/
 }
+
 void compare_tree(f_tree *cur,f_tree *prev){
 	//f_tree *stat=cur;
 	while(1){
@@ -196,7 +245,7 @@ int compare_node(f_tree *cur,f_tree *prev){
 			return 1;
 		}
 	
-			//printf("%s랑 %s이름 달랑\n",cur->fname,prev->fname);
+			printf("%s랑 %s이름 달랑\n",cur->fname,prev->fname);
 			if(S_ISDIR(cur->statbuf.st_mode))
 				if(cur->child !=NULL)
 					if(compare_node(cur->child,prev)==1)
@@ -220,7 +269,7 @@ f_tree* make_tree(char *path){//파일 트리만들기
 	int cnt;
 	int isfirst=1;
 	char tmp[BUFFER_SIZE];
-	if(chdir(path)<0){//학번디렉토리 파일로 이동
+	if(chdir(path)<0){//check 디렉토리 파일로 이동
 		fprintf(stderr,"chdir error");
 		exit(1);
 	}
