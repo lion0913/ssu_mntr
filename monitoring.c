@@ -8,18 +8,18 @@
 #include<sys/wait.h>
 #include<sys/times.h>
 #include<time.h>
-#include "ssu_mntr.h"
-#define BUFFER_SIZE 1024
+#include "monitoring.h"
+/*#define BUFFER_SIZE 1024
 #define MAX_TOKEN 20 //입력가능한 최대 토큰 수를 20개로 가정
 #define MODIFY 0
 #define DELETE 1
 #define CREATE 2
 #define N -1
-
+*/
 f_changefile f_change[BUFFER_SIZE];
-f_tree * make_tree(char *path);//학번디렉토리안의 파일들을 트리화하는 함수
+//f_tree * make_tree(char *path);//학번디렉토리안의 파일들을 트리화하는 함수
 
-void ssu_mntr(int argc,char *argv[]){
+int main(int argc,char *argv[]){
 	FILE *fp;
 	char pwd[BUFFER_SIZE];
 	//char log_path[BUFFER_SIZE];//log.txt의 절대경로
@@ -57,14 +57,14 @@ void ssu_mntr(int argc,char *argv[]){
 		}
 		compare_tree(cur_tree->child,prev_tree->child);//기존, 현재 트리를 비교
 		num=w_createlist(cur_tree->child,DELETE,0);//f_change 구조체를 채우는 함수(DELETE,CREATE 따로 생성 후 log.txt에 한번에 시간순으로 정렬해서 넣을것임)
-		printf("num : %d\n",num);
+	//	printf("num : %d\n",num);
 		num=w_createlist(cur_tree->child,CREATE,num);
-		printf("num : %d\n",num);
+	//	printf("num : %d\n",num);
 		sort_list(num);//구조체 시간순 정렬
 		write_log(num);
-		for(int i=0;i<num;i++)
+	/*	for(int i=0;i<num;i++)
 			printf("f_change[%d]=%d,%s\n",i,f_change[i].state,f_change[i].fname);
-//		break;
+*///		break;
 		//로그에 기록을 끝낸상태
 		//new_tree를 prev_tree로 옮겨주는 작업수행 (계속 트리를 갱신해주기 위해 필요)
 		//init_tree(prev_tree);
@@ -211,23 +211,23 @@ int compare_node(f_tree *cur,f_tree *prev){
 	while(1){
 		if(strcmp(cur->fname,prev->fname)==0){//같은 이름을 가진 파일이 있는경우
 			
-			printf("%s랑 %s이름같앙\n",cur->fname,prev->fname);
+	//		printf("%s랑 %s이름같앙\n",cur->fname,prev->fname);
 			if(cur->statbuf.st_mtime != prev->statbuf.st_mtime)//수정시간이 다른경우
 				cur->state=MODIFY;//트리의 상태를 MODIFY로 변경
 			return 1;
 		}
 	
-			printf("%s랑 %s이름 달랑\n",cur->fname,prev->fname);
+	//		printf("%s랑 %s이름 달랑\n",cur->fname,prev->fname);
 			if(S_ISDIR(cur->statbuf.st_mode))
 				if(cur->child !=NULL)
 					if(compare_node(cur->child,prev)==1)
 						break;
 			if(cur->sibling!=NULL){
-				printf("%s의 sibling(%s)있음\n",cur->fname,cur->sibling->fname);
+	//			printf("%s의 sibling(%s)있음\n",cur->fname,cur->sibling->fname);
 				cur=cur->sibling;
 			}
 			else{
-				printf("%s는 sibling없음\n",cur->fname);
+	//			printf("%s는 sibling없음\n",cur->fname);
 				cur->state=DELETE;
 				break;
 			}

@@ -32,7 +32,18 @@ typedef struct f_changefile{
         int state;
 }f_changefile;
 
+char path[BUFFER_SIZE];
+char check_path[BUFFER_SIZE];
+f_tree * make_tree(char *path);//학번디렉토리안의 파일들을 트리화하는 함수
+
 //f_changefile f_change[BUFFER_SIZE];
+//int iOption=0;
+//int rOption=0;
+
+void doDelete(char *token[]);
+void prompt(void);
+void print_usage(void);
+void print_tree(f_tree *head,int depth);
 
 void write_log(int num);
 int w_createlist(f_tree *tree,int state,int index);
@@ -41,10 +52,7 @@ void sort_list(int num);
 int w_changelist(f_tree *tree,int cnt);
 void compare_tree(f_tree *cur,f_tree *prev);
 int compare_node(f_tree *cur,f_tree *prev);
-//void print_usage(void);
 char log_path[BUFFER_SIZE];//log.txt의 절대경로
 char check_path[BUFFER_SIZE];//check디렉토리의 절대경로
 
-void ssu_mntr(int argc,char *argv[]);
-//f_tree * make_tree(char *path);//학번디렉토리안의 파일들을 트리화하는 함수
 

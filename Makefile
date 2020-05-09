@@ -1,15 +1,16 @@
-ssu_mntr : main.o prompt.o ssu_mntr.o
+ssu_mntr : main.o monitoring.o prompt.o
 	gcc main.o prompt.o -o ssu_mntr
-	gcc ssu_mntr.o -o monitoring
+	gcc monitoring.o -o monitoring
 
-main.o : main.c ssu_mntr.h
+main.o : main.c monitoring.h
 	gcc -c main.c
 
-prmpt.o : prompt.c prompt.h
+prompt.o : prompt.c monitoring.c monitoring.h
 	gcc -c prompt.c
+	gcc -c monitoring.c
 
-ssu_mntr.o : ssu_mntr.c ssu_mntr.h
-	gcc -c ssu_mntr.c
+monitoring.o : monitoring.c monitoring.h
+	gcc -c monitoring.c
 
 clean : 
 	rm *.o
