@@ -23,8 +23,8 @@ void prompt(){
 	sprintf(check_path,"%s/%s",path,"check"); //check_path : check디렉토리의 경로
 	
 	f_tree *head=malloc(sizeof(f_tree));
-	pid_t daemon;
-	
+	pid_t pid,daemon;
+	pid=getpid();
 	if((daemon=vfork())<0){
 		fprintf(stderr,"fork error\n");
 		exit(1);
@@ -35,6 +35,8 @@ void prompt(){
 
 
 	while(1){
+		if(pid !=getpid())
+			break;
 		memset(token,0,BUFFER_SIZE);//token을 다시 비워줌
 
 		//프롬프트 모양 : "학번>"문자 출력
@@ -80,18 +82,21 @@ void prompt(){
 		*/
 		if(strcmp(token[0],"delete")==0){
 			//입력된 옵션 확인
-			printf("\ndelete 호출\n");
+			//printf("\ndelete 호출\n");
 			//FILENAME 입력이 없는 경우 에러처리
 			if(strcmp(token[1],"")==0){
 				fprintf(stderr,"input FILENAME\n");
 				exit(1);
 			}
 			//-i,-r옵션 처리
-			if(!strcmp(token[2],"-i") || !strcmp(token[3],"-i")){
+			if(argc==2 || argc==3 || argc==4){//delete뒤에 옵션없이  파일이름만 붙을경우
+			printf("무사히 넘김,%d\n",argc);
+			}
+			else if(!strcmp(token[2],"-i") || !strcmp(token[4],"-i")){
 				printf("-i입력\n");
 				iOption=1;
 			}
-			if((strcmp(token[2],"-r")==0) || (strcmp(token[3],"-r"))==0){
+			else if((strcmp(token[2],"-r")==0) || (strcmp(token[4],"-r"))==0){
 				printf("-r입력\n");
 				rOption=1;
 			}
@@ -142,7 +147,6 @@ void print_tree(f_tree *head,int depth){
 	//int isFirst=1;
 	f_tree *now=malloc(sizeof(f_tree));
 	now=head;
-	
 	while(1){
 		tmp=now->fname;
 		filename=strtok(tmp,"/");
@@ -184,22 +188,21 @@ void print_tree(f_tree *head,int depth){
 
 }
 void doDelete(char *token[20]){
-	printf("dodelete실행\n");
+	int cnt=0,i,t=0;
 	FILE *fp;
+	struct tm tm;
+	time_t end,now;
+
+	int endOption=0;
 	char fname[BUFFER_SIZE];
 	char trash_path[BUFFER_SIZE];
 	char *tpath,*tmp;//삭제할 파일의 절대경로
+	struct dirent **namelist;
 	memset(trash_path,0,BUFFER_SIZE);
 
 	chdir(check_path);//체크디렉토리로 이동
-	printf("이동완료\n");
 	tpath=malloc(sizeof(char) * BUFFER_SIZE);//tpath의 공간할당
 	realpath(token[1],tpath);//파일의 상대경로를 절대경로로 변경
-	printf("tpath: %s\n",tpath);//확인용
-	/*if(strstr(tpath,check_path)==NULL){
-		fprintf(stderr,"doesn't exist in dir\n");
-		exit(1);
-	}*/
 	
 
 	//입력한 파일이 절대경로일수도 있음
@@ -210,15 +213,59 @@ void doDelete(char *token[20]){
 	tmp=strtok(token[1],"/");
 	while((tmp=strtok(NULL,"/"))!=NULL)
 		strcpy(fname,tmp);
-	printf("fname : %s\n",fname);//확인용
-
-	/*
-	sprintf(trash_path,"%s/%s",check_path,"trash");
-	printf("%s\n",trash_path);
-	if((fopen(trash_path,"w+"))==NULL){
-		fprintf(stderr,"fopen error\n");
+	cnt=scandir(check_path,&namelist,NULL,alphasort);//check디렉토리에 존재하는 파일 조회
+	for(i=0;i<cnt;i++){//삭제 파일이 check디렉토리에 있는지 검사
+		if(strcmp(namelist[i]->d_name,fname)==0)
+			break;
+	}
+	if(i==cnt){
+		fprintf(stderr,"%s doesn't exist in check_dir\n",fname);
 		exit(1);
-	}*/
+	}
+	//삭제한 파일은 제출할 소스코드 디렉토리 밑에 있는 "trash"디렉토리로 이동
+	chdir(path);
+	if(access("trash",F_OK)<0)
+		mkdir("trash",0755);//없으면 생성
+	sprintf(trash_path,"%s/%s",path,"trash");
+	chdir(trash_path);
+	//files,info 서브 디렉토리 생성
+	mkdir("files",0755);
+	mkdir("infos",0755);
+	
+	//ENDTIME이 입력된경우
+	if(token[2][0]>='0' && token[2][0]<'9' && token[3][0]>='0' && token[3][0]<'9')
+	{
+
+		//시간 가져오기
+		endOption=1;
+		int year,mon,day,hour,min,sec;
+		sscanf(token[2],"%d-%d-%d",&year,&mon,&day);
+		sscanf(token[3],"%d:%d:%d",&hour,&min,&sec);
+
+		tm.tm_year=year-1900;
+		tm.tm_mon=mon-1;
+		tm.tm_mday=day;
+		tm.tm_hour=hour;
+		tm.tm_min=min;
+		tm.tm_sec=sec;
+
+		now=time(NULL);//현재 시간 받아오기
+		end=mktime(&tm);//종료 시간 생성
+		t=difftime(end,now);
+		if(t<0){
+			printf("invalid endtime\n");
+			exit(1);
+		}
+	}
+	// iOption : trash디렉토리 이동 없이 삭제
+	if(iOption==1){
+		printf("iOption 입력\n");
+
+	}
+	// rOption : 지정 시간에 삭제 시 삭제여부 확인
+	if(rOption==1){
+		printf("rOption 입력\n");
+	}
 
 	
 }
