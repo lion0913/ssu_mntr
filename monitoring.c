@@ -9,23 +9,17 @@
 #include<sys/times.h>
 #include<time.h>
 #include "monitoring.h"
-/*#define BUFFER_SIZE 1024
-#define MAX_TOKEN 20 //입력가능한 최대 토큰 수를 20개로 가정
-#define MODIFY 0
-#define DELETE 1
-#define CREATE 2
-#define N -1
-*/
+
 f_changefile f_change[BUFFER_SIZE];
 //f_tree * make_tree(char *path);//학번디렉토리안의 파일들을 트리화하는 함수
-
+void set_daemon_process(void);
 int main(int argc,char *argv[]){
 	FILE *fp;
 	char pwd[BUFFER_SIZE];
 	//char log_path[BUFFER_SIZE];//log.txt의 절대경로
-
+	set_daemon_process();
 	getcwd(pwd,BUFFER_SIZE);//현재위치
-//printf("%s\n",pwd);
+	//printf("%s\n",pwd);
 	if(access("check",F_OK)!=0){//학번디렉토리의 존재여부 확인
 		fprintf(stderr,"no directory\n");
 		exit(1);//없으면 에러
@@ -45,10 +39,12 @@ int main(int argc,char *argv[]){
 	int num;
 	f_tree *prev_tree;
 	f_tree *cur_tree;
+
+	printf("monitoring pid: %d\n", getpid());
 	while(1){
 		cur_tree=make_tree(check_path);//check디렉토리에 대한 트리 생성
 		initstat(cur_tree);//state초기화
-		
+
 		//첫번째 실행인 경우 새롭게 만든 cur_tree를 기존 트리로 설정
 		if(isfirst==1){
 			prev_tree=cur_tree;
@@ -57,25 +53,38 @@ int main(int argc,char *argv[]){
 		}
 		compare_tree(cur_tree->child,prev_tree->child);//기존, 현재 트리를 비교
 		num=w_createlist(cur_tree->child,DELETE,0);//f_change 구조체를 채우는 함수(DELETE,CREATE 따로 생성 후 log.txt에 한번에 시간순으로 정렬해서 넣을것임)
-	//	printf("num : %d\n",num);
+		//	printf("num : %d\n",num);
 		num=w_createlist(cur_tree->child,CREATE,num);
-	//	printf("num : %d\n",num);
+		//	printf("num : %d\n",num);
 		sort_list(num);//구조체 시간순 정렬
 		write_log(num);
-	/*	for(int i=0;i<num;i++)
+		/*	for(int i=0;i<num;i++)
 			printf("f_change[%d]=%d,%s\n",i,f_change[i].state,f_change[i].fname);
-*///		break;
+		 *///		break;
 		//로그에 기록을 끝낸상태
 		//new_tree를 prev_tree로 옮겨주는 작업수행 (계속 트리를 갱신해주기 위해 필요)
 		//init_tree(prev_tree);
 		prev_tree=cur_tree;
-		
+
 		sleep(1);
 	}
 }
+void set_daemon_process(void){
+	pid_t pid;
+	if((pid=fork())<0){
+		fprintf(stderr,"fork error\n");
+		exit(1);
+	}
+	else if(pid!=0){//부모면 죽임
+		exit(0);
+	}
+	setsid();//새 세션 ㅜㅡㅜㅜ:?생성
+
+}
+
 void write_log(int num){
 	char *tmp,fname[BUFFER_SIZE];
-	
+
 	char timeform[BUFFER_SIZE];
 	char logform[BUFFER_SIZE];
 	FILE *fp;
@@ -93,7 +102,7 @@ void write_log(int num){
 		t=*localtime(&f_change[i].time);
 		sprintf(timeform,"%.4d-%02d-%02d %02d:%02d:%02d",t.tm_year+1900,t.tm_mon+1,t.tm_mday,t.tm_hour,t.tm_min,t.tm_sec);
 		//printf("%s\n",timeform);
-		
+
 		switch(f_change[i].state){
 			case MODIFY : 
 
@@ -106,7 +115,7 @@ void write_log(int num){
 				fprintf(fp,"[%s][%s_%s]\n",timeform,"delete",fname);
 				break;
 		}		
-		
+
 	}
 	fclose(fp);
 }
@@ -125,7 +134,7 @@ void sort_list(int num){//f_change 구조체를 시간순으로 정렬해주는 
 void initstat(f_tree *cur){//파일구조체의 state를 초기화해주는 함수
 	while(1){
 		cur->state=N;//현재노드의 state를 N으로 설정(아직 비교되지 않았음을 의미)
-		
+
 		//노드가 디렉토리라면 자식여부 확인 후 재귀
 		if(S_ISDIR(cur->statbuf.st_mode))
 			if(cur->child!=NULL)
@@ -173,11 +182,11 @@ int w_createlist(f_tree *tree,int state,int index){//파일상태변경여부를
 			break;
 	}
 	return index;
-		
+
 	/*while(1){
-		//switch(tree->status){
-			
-		
+	//switch(tree->status){
+
+
 	}*/
 }
 
@@ -201,8 +210,8 @@ void compare_tree(f_tree *cur,f_tree *prev){
 		//	if(cur->statbuf.st_mtime !=prev->statbuf.st_mtime)//수정 시간이 변경된 경우 MODIFY로 상태 변경
 		//		cur->state=MODIFY;
 		//}
-	///	else{
-	//	}
+		///	else{
+		//	}
 		//노드 이름이 다른경우 delete아님?
 		//
 	}
@@ -210,28 +219,28 @@ void compare_tree(f_tree *cur,f_tree *prev){
 int compare_node(f_tree *cur,f_tree *prev){
 	while(1){
 		if(strcmp(cur->fname,prev->fname)==0){//같은 이름을 가진 파일이 있는경우
-			
-	//		printf("%s랑 %s이름같앙\n",cur->fname,prev->fname);
+
+			//		printf("%s랑 %s이름같앙\n",cur->fname,prev->fname);
 			if(cur->statbuf.st_mtime != prev->statbuf.st_mtime)//수정시간이 다른경우
 				cur->state=MODIFY;//트리의 상태를 MODIFY로 변경
 			return 1;
 		}
-	
-	//		printf("%s랑 %s이름 달랑\n",cur->fname,prev->fname);
-			if(S_ISDIR(cur->statbuf.st_mode))
-				if(cur->child !=NULL)
-					if(compare_node(cur->child,prev)==1)
-						break;
-			if(cur->sibling!=NULL){
-	//			printf("%s의 sibling(%s)있음\n",cur->fname,cur->sibling->fname);
-				cur=cur->sibling;
-			}
-			else{
-	//			printf("%s는 sibling없음\n",cur->fname);
-				cur->state=DELETE;
-				break;
-			}
-	
+
+		//		printf("%s랑 %s이름 달랑\n",cur->fname,prev->fname);
+		if(S_ISDIR(cur->statbuf.st_mode))
+			if(cur->child !=NULL)
+				if(compare_node(cur->child,prev)==1)
+					break;
+		if(cur->sibling!=NULL){
+			//			printf("%s의 sibling(%s)있음\n",cur->fname,cur->sibling->fname);
+			cur=cur->sibling;
+		}
+		else{
+			//			printf("%s는 sibling없음\n",cur->fname);
+			cur->state=DELETE;
+			break;
+		}
+
 		//return 0;
 	}
 	return 0;

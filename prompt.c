@@ -33,6 +33,8 @@ void prompt(){
 		execl("./monitoring","",(char*)0);
 	}
 
+	printf("prompt parent : %d\n", pid);
+
 
 	while(1){
 		if(pid !=getpid())
