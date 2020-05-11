@@ -11,10 +11,11 @@
 #include "monitoring.h"
 int iOption=0;
 int rOption=0;
-
+int lOption=0;
 
 void prompt(){
 	char input[BUFFER_SIZE];
+	char tpath[BUFFER_SIZE];
 	char *token[MAX_TOKEN];
 	memset(path,0,BUFFER_SIZE);
 	memset(check_path,0,BUFFER_SIZE);
@@ -33,11 +34,12 @@ void prompt(){
 		execl("./monitoring","",(char*)0);
 	}
 
+	printf("prompt parent : %d\n", pid);
+
 
 	while(1){
 		if(pid !=getpid())
 			break;
-		//for(int j=0;j<20;j++
 		memset(token,0,MAX_TOKEN);//token을 다시 비워줌
 
 		//프롬프트 모양 : "학번>"문자 출력
@@ -46,7 +48,6 @@ void prompt(){
 		//delete,size,recover,tree,exit,help수행
 		//이외는 help실행과 동일 출력후 continue;
 		fgets(input,BUFFER_SIZE,stdin);//명령어 읽어들이기
-		//token[strlen(token)-1]='\0';
 		//엔터 입력시 프롬프트 재출력
 		if(strcmp(input,"\n")==0){
 			continue;
@@ -76,26 +77,21 @@ void prompt(){
 		*/
 		if(strcmp(token[0],"delete")==0){
 			//입력된 옵션 확인
-			//printf("\ndelete 호출\n");
-			//FILENAME 입력이 없는 경우 에러처리
 			if(strcmp(token[1],"")==0){
 				fprintf(stderr,"input FILENAME\n");
 				exit(1);
 			}
 			//-i,-r옵션 처리
 			//if(argc==2 || argc==3 || argc==4){//delete뒤에 옵션없이  파일이름만 붙을경우
-			//printf("무사히 넘김,%d\n",argc);
-			//}
 			if(!strcmp(token[2],"-i") || !strcmp(token[4],"-i")){
-				printf("-i입력\n");
 				iOption=1;
 			}
 			else if((strcmp(token[2],"-r")==0) || (strcmp(token[4],"-r"))==0){
-				printf("-r입력\n");
 				rOption=1;
 			}
 
 			doDelete(token);
+			check_info();//info 디렉토리의 사이즈 체크
 			continue;
 		}
 		//size 옵션
@@ -103,9 +99,34 @@ void prompt(){
 			printf("\nsize 호출\n");
 			continue;
 		}
-		//recover 옵션
+		/* 
+		 * RECOVER 옵션 : recover [filename] [option]
+		 * trash 디렉토리 안에 있는 파일을 원래 경로로 복구
+		 * 동일한 이름이 있을 경우 파일이름, 삭제시간, 수정시간 보여줌
+		 * 복구 시 이름 중복된다면 파일 처음에 "숫자_" 추가
+		 */
 		else if(strcmp(token[0],"recover")==0){
-			printf("\nrecover 호출\n");
+			//printf("\nrecover 호출\n");
+			//printf("argc:%d\n",argc);
+			if(argc>3 || argc==1){
+				fprintf(stderr,"wrong input\n");
+				continue;
+			}
+			if(!strcmp(token[2],"-l"))
+				lOption=1;
+			char fname[BUFFER_SIZE];
+			strcpy(fname,token[1]);
+
+			//함수에 들어가기 전 파일 존재여부 확인
+			sprintf(tpath,"%s/%s/%s",path,"trash/infos",fname);
+			printf("%s\n",tpath);
+			if(access(tpath,F_OK)<0){
+				fprintf(stderr,"filename(%s) not existed!\n",fname);
+				continue;
+			}
+					
+			restore_file(fname);
+			
 			continue;
 		}
 		//TREE 옵션
@@ -136,10 +157,8 @@ void prompt(){
 	}
 	exit(0);
 }
-//int isFirst=1;
 void print_tree(f_tree *head,int depth){
 	char *filename,*tmp;
-	//int isFirst=1;
 	f_tree *now=malloc(sizeof(f_tree));
 	now=head;
 	while(1){
@@ -147,40 +166,33 @@ void print_tree(f_tree *head,int depth){
 		filename=strtok(tmp,"/");
 		while((tmp=strtok(NULL,"/"))!=NULL)
 			filename=tmp;//딱 파일이름만 불러옴
-	//	printf("filename : %s\n",filename);//확인용
-		/*if(isFirst==1){
+		if(now->sibling!=NULL){
 			printf("├─");
-			isFirst=0;
 		}
-		else{*/
-			//if(depth>
-		if(now->sibling!=NULL)printf("├─");
-		else printf("└─");
-		
+		else{
+		       	printf("└─");
+		}
 		printf(" %s ",filename);
 		if(S_ISDIR(now->statbuf.st_mode)){
 			if(now->child !=NULL){
 				printf("\n");
 				depth++;
-				for(int i=1;i<depth;i++)
-					printf("│   ");
 				
+				for(int i=1;i<depth;i++){
+					printf("│   ");
+				}
 				print_tree(now->child,depth);
 				depth--;
 			}
 		}
 		if(now->sibling !=NULL){
 			now=now->sibling;
-			
 			printf("\n");
 			for(int i=1;i<depth;i++)
-		              printf("│   ");
+				printf("│   ");
 		}
-		else
-			break;
+		else	break;
 	}
-	//printf("\n");	
-
 }
 void doDelete(char *token[20]){
 	int cnt=0,i,t=0;
@@ -188,8 +200,6 @@ void doDelete(char *token[20]){
 	struct tm tm;
 	time_t end,now;
 	struct stat statbuf;//delete
-	//iOption=0;
-	//rOption=0;
 	int endOption=0;
 	char fname[BUFFER_SIZE];
 	char trash_path[BUFFER_SIZE];
@@ -228,7 +238,6 @@ void doDelete(char *token[20]){
 	//files,info 서브 디렉토리 생성
 	mkdir("files",0755);
 	mkdir("infos",0755);
-	//printf("ㄱ");
 	//
 	printf("%s\n",tpath);
 	//ENDTIME이 입력된경우
@@ -236,8 +245,6 @@ void doDelete(char *token[20]){
 	{
 		
 		//시간 가져오기
-		iOption=0;
-		rOption=0;
 		endOption=1;
 		int year,mon,day,hour,min,sec;
 		sscanf(token[2],"%d-%d-%d",&year,&mon,&day);
@@ -260,9 +267,10 @@ void doDelete(char *token[20]){
 	}
 	// iOption : trash디렉토리 이동 없이 삭제
 	if(iOption==1){
-		printf("iOption 입력\n");
-		printf("%s\n",tpath);
-		
+		iOption=0;
+		if(endOption==1){
+			sleep(t);
+		}
 		stat(tpath,&statbuf);
 		if(S_ISDIR(statbuf.st_mode)){
 			remove_directory(tpath);
@@ -270,12 +278,7 @@ void doDelete(char *token[20]){
 			remove(tpath);
 
 	}
-	// rOption : 지정 시간에 삭제 시 삭제여부 확인
-	else if(rOption==1){
-		printf("rOption 입력\n");
-	}
 	else{
-		printf("%s,%s\n",tpath,fname);
 		move_trash(tpath,t);
 	}
 	//일반삭제는 trash 디렉토리로 이동
@@ -427,3 +430,79 @@ void free_tree(f_tree *head)
 
 	free(head);
 }
+void check_info(void){
+	char info_path[BUFFER_SIZE];
+	struct dirent **namelist;
+	struct stat statbuf;
+	int amount,count;
+	f_tree *head;
+	sprintf(info_path,"%s/%s",path,"trash/infos");
+	chdir(info_path);
+	//arrange_trash에서 삭제된 이후에도 2KB가 넘을 수 있기 때문에 while문을 돌려 
+	//크기 체크를 해주면서 반복해야함
+	while(1){
+		amount=9;
+		count=scandir(info_path,&namelist,NULL,alphasort);
+		for(int i=0;i<count;i++){
+			if(!strcmp(namelist[i]->d_name,".") || !strcmp(namelist[i]->d_name,".."))
+				continue;
+			stat(namelist[i]->d_name,&statbuf);
+			amount+=statbuf.st_size;
+		}
+
+		if(amount>1000){
+			//trash디렉토리 재정리해줘야됨
+			arrange_trash(namelist,count);
+		}
+		else break;
+		for(int i=0;i<count;i++)
+			free(namelist[i]);
+		free(namelist);
+	}
+
+		printf("trash size : %d\n",amount);
+	//head=make_tree(info_path);
+	//amount=head->size;
+	//while(1){
+	//	count=scandir(info_path,&nmelist,NULL,alphasort);
+		
+}
+void arrange_trash(struct dirent **namelist,int count){
+	char info_path[BUFFER_SIZE],file_path[BUFFER_SIZE];
+	struct stat statbuf;
+	time_t oldtime=-1;
+	char oldfile[BUFFER_SIZE];
+	int isFirst=1;
+	sprintf(info_path,"%s/%s",path,"trash/infos");
+	sprintf(file_path,"%s/%s",path,"trash/files");
+	chdir(info_path);
+	
+	for(int i=0;i<count;i++){
+		if(!strcmp(namelist[i]->d_name,".") || !strcmp(namelist[i]->d_name,".."))
+			continue;
+		stat(namelist[i]->d_name,&statbuf);
+		if(isFirst==1){
+			oldtime=statbuf.st_mtime;
+			strcpy(oldfile,namelist[i]->d_name);
+			isFirst=0;
+		}
+		if(oldtime>statbuf.st_mtime){
+			strcpy(oldfile,namelist[i]->d_name);
+			//printf("%s\n",oldfile);
+			oldtime=statbuf.st_mtime;
+		}
+
+	}
+	remove(oldfile); //info_path에서 가장 오래된 파일 삭제
+	chdir(file_path);
+	remove(oldfile);//file_path에서 가장 오래된 파일 삭제
+
+}/*
+void recover_trash(char *fname){
+	char tpath[BUFFER_SIZE],info_path[BUFFER_SIZE],file_path[BUFFER_SIZE];
+
+	sprintf(tpath,"%s/%s/%s/%s",path,"trash");
+	//sprintf(file_path,"%s/%s",tpath,"files");
+	//sprintf(info_path,"%s/%s",tpath,"infos");
+}
+*/

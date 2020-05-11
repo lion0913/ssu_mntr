@@ -24,6 +24,7 @@ typedef struct f_tree{
         struct f_tree *sibling;
         struct f_tree *child;
         int state;
+	int size;
 }f_tree;
 
 typedef struct f_changefile{
@@ -41,6 +42,9 @@ void doDelete(char *token[]);
 void prompt(void);
 void print_usage(void);
 void print_tree(f_tree *head,int depth);
+void check_info(void);//info 디렉토리의 크기 측정
+void arrange_trash(struct dirent **namelist,int count);//trash 디렉토리 재정리[2KB에 맞춰서]
+void restore_file(char *fname);
 
 void write_log(int num);
 int w_createlist(f_tree *tree,int state,int index);
