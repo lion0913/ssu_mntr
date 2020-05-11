@@ -16,3 +16,4 @@ clean :
 	rm *.o
 	rm monitoring
 	rm ssu_mntr
+	rm log.txt
