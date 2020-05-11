@@ -37,7 +37,8 @@ void prompt(){
 	while(1){
 		if(pid !=getpid())
 			break;
-		memset(token,0,BUFFER_SIZE);//token을 다시 비워줌
+		//for(int j=0;j<20;j++
+		memset(token,0,MAX_TOKEN);//token을 다시 비워줌
 
 		//프롬프트 모양 : "학번>"문자 출력
 		printf("20182611>");
@@ -50,28 +51,21 @@ void prompt(){
 		if(strcmp(input,"\n")==0){
 			continue;
 		}
-		//memset(token,0,BUFFER_SIZE);//token을 다시 비워줌
 		token[0]=strtok(input," ");//첫번째 글자인 명령어를 가져옴
 		int argc=1;
-		if((daemon=vfork())<0){
-			fprintf(stderr,"fork error\n");
-			exit(1);
-		}
-		else if(daemon==0){
-			execl("./monitoring","",(char*)0);
-		}
 		
 		while(argc<MAX_TOKEN){	
 			//공백문자를 기준으로 토큰을 분리
 			token[argc]=strtok(NULL," ");
 			if(token[argc]==NULL){//토큰에 아무값도 들어가지 않은 경우
-			for(int i=0;;i++){
-				if(token[argc-1][i]=='\n'){
-					//토큰의 맨 마지막에 들어온 개행문자를 제거
-					token[argc-1][i]='\0';
-					break;
+				for(int i=0;;i++){
+					if(token[argc-1][i]=='\n'){
+						//토큰의 맨 마지막에 들어온 개행문자를 제거
+						token[argc-1][i]='\0';
+						break;
+					}
 				}
-			}
+				token[argc]="\0";
 			break;
 			}
 			argc++;
@@ -89,10 +83,10 @@ void prompt(){
 				exit(1);
 			}
 			//-i,-r옵션 처리
-			if(argc==2 || argc==3 || argc==4){//delete뒤에 옵션없이  파일이름만 붙을경우
-			printf("무사히 넘김,%d\n",argc);
-			}
-			else if(!strcmp(token[2],"-i") || !strcmp(token[4],"-i")){
+			//if(argc==2 || argc==3 || argc==4){//delete뒤에 옵션없이  파일이름만 붙을경우
+			//printf("무사히 넘김,%d\n",argc);
+			//}
+			if(!strcmp(token[2],"-i") || !strcmp(token[4],"-i")){
 				printf("-i입력\n");
 				iOption=1;
 			}
@@ -120,6 +114,7 @@ void prompt(){
 			printf("check\n");
 			//생성한 트리를 출력 
 			print_tree(head->child,1);//check 디렉토리의 첫째부터 차례로 출력,1: 트리의 깊이
+			free_tree(head);
 			printf("\n");
 			continue;
 		}
@@ -192,7 +187,9 @@ void doDelete(char *token[20]){
 	FILE *fp;
 	struct tm tm;
 	time_t end,now;
-
+	struct stat statbuf;//delete
+	//iOption=0;
+	//rOption=0;
 	int endOption=0;
 	char fname[BUFFER_SIZE];
 	char trash_path[BUFFER_SIZE];
@@ -231,12 +228,16 @@ void doDelete(char *token[20]){
 	//files,info 서브 디렉토리 생성
 	mkdir("files",0755);
 	mkdir("infos",0755);
-	
+	//printf("ㄱ");
+	//
+	printf("%s\n",tpath);
 	//ENDTIME이 입력된경우
 	if(token[2][0]>='0' && token[2][0]<'9' && token[3][0]>='0' && token[3][0]<'9')
 	{
-
+		
 		//시간 가져오기
+		iOption=0;
+		rOption=0;
 		endOption=1;
 		int year,mon,day,hour,min,sec;
 		sscanf(token[2],"%d-%d-%d",&year,&mon,&day);
@@ -260,14 +261,103 @@ void doDelete(char *token[20]){
 	// iOption : trash디렉토리 이동 없이 삭제
 	if(iOption==1){
 		printf("iOption 입력\n");
+		printf("%s\n",tpath);
+		
+		stat(tpath,&statbuf);
+		if(S_ISDIR(statbuf.st_mode)){
+			remove_directory(tpath);
+		}else
+			remove(tpath);
 
 	}
 	// rOption : 지정 시간에 삭제 시 삭제여부 확인
-	if(rOption==1){
+	else if(rOption==1){
 		printf("rOption 입력\n");
 	}
+	else{
+		printf("%s,%s\n",tpath,fname);
+		move_trash(tpath,t);
+	}
+	//일반삭제는 trash 디렉토리로 이동
+	
 
 	
+}
+void move_trash(char *path, int t){
+	char c;
+	sleep(t);
+	if(rOption==1){
+		printf("Delete [y/n]? ");
+		c=getchar();
+		if(c=='y')
+			move_file(path);
+			//파일 delete
+	}
+	else
+		move_file(path);
+		//파일 삭제
+}
+void move_file(char *fpath){
+	char files[BUFFER_SIZE],infos[BUFFER_SIZE],orig[BUFFER_SIZE];
+	char tmp[BUFFER_SIZE],dform[BUFFER_SIZE],mform[BUFFER_SIZE];
+	char *fname;
+	struct tm tm;
+	time_t t;
+	FILE *fp;
+	struct stat statbuf;
+	stat(fpath,&statbuf);//파일 삭제 전의 정보 불러옴
+	
+	memset(tmp,0,BUFFER_SIZE);
+	memset(dform,0,BUFFER_SIZE);
+	memset(mform,0,BUFFER_SIZE);
+	memset(orig,0,BUFFER_SIZE);
+	strcpy(orig,fpath);
+	fname=strtok(fpath,"/");
+	while((fpath=strtok(NULL,"/"))!=NULL)
+		strcpy(fname,fpath);
+	//printf("%s",fname);//확인용
+	sprintf(files,"%s/%s",path,"trash/files");
+	sprintf(infos,"%s/%s",path,"trash/infos");
+	printf("orig: %s\n",orig);
+	printf("files : %s\n",files);
+	sprintf(tmp,"%s/%s",files,fname);
+	rename(orig,tmp);//trash/files로 해당 파일 이동
+	t=time(NULL);//t : 삭제 시간
+	tm=*localtime(&t);
+	sprintf(dform,"D : %04d-%02d-%02d %02d:%02d:%02d",tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,tm.tm_hour, tm.tm_min, tm.tm_sec);
+	
+	sprintf(mform,"M : %04d-%02d-%02d %02d:%02d:%02d",tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+	chdir(infos);
+	if((fp=fopen(fname,"w+"))<0){
+		fprintf(stderr,"fopen error for %s\n",fname);
+		exit(1);
+	}
+	fprintf(fp,"[Trash info]\n");
+	fprintf(fp,"%s\n",orig);
+	fprintf(fp,"%s\n",dform);
+	fprintf(fp,"%s\n",mform);
+	fclose(fp);
+	chdir(check_path);
+}
+void remove_directory(const char *tpath){
+	DIR *dp;
+	char tmp[BUFFER_SIZE];
+	struct dirent *dirp;
+	struct stat statbuf;
+	dp=opendir(tpath);
+	while((dirp=readdir(dp))!=NULL){
+		if(!strcmp(dirp->d_name,".") || !strcmp(dirp->d_name,".."))
+			continue;
+		sprintf(tmp,"%s/%s",tpath,dirp->d_name);
+		lstat(tmp,&statbuf);
+		if(S_ISDIR(statbuf.st_mode))
+			remove_directory(tmp);
+		else
+			remove(tmp);
+	}
+	closedir(dp);
+	rmdir(tpath);
 }
 void print_usage(){
 	printf("***************************************************\n");
@@ -326,4 +416,14 @@ f_tree* make_tree(char *path){//파일 트리만들기
 		
 	}
 	return head;
+}
+
+void free_tree(f_tree *head)
+{
+	if(head->child != NULL)
+		free_tree(head->child);
+	if(head->sibling != NULL)
+		free_tree(head->sibling);
+
+	free(head);
 }

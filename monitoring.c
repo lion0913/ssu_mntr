@@ -9,13 +9,6 @@
 #include<sys/times.h>
 #include<time.h>
 #include "monitoring.h"
-/*#define BUFFER_SIZE 1024
-#define MAX_TOKEN 20 //입력가능한 최대 토큰 수를 20개로 가정
-#define MODIFY 0
-#define DELETE 1
-#define CREATE 2
-#define N -1
-*/
 f_changefile f_change[BUFFER_SIZE];
 //f_tree * make_tree(char *path);//학번디렉토리안의 파일들을 트리화하는 함수
 
@@ -40,7 +33,7 @@ int main(int argc,char *argv[]){
 		exit(1);
 	}
 	fclose(fp);
-
+	init_daemon();
 	int isfirst=1;
 	int num;
 	f_tree *prev_tree;
@@ -69,7 +62,7 @@ int main(int argc,char *argv[]){
 		//new_tree를 prev_tree로 옮겨주는 작업수행 (계속 트리를 갱신해주기 위해 필요)
 		//init_tree(prev_tree);
 		prev_tree=cur_tree;
-		
+	//	printf("야야\n");
 		sleep(1);
 	}
 }
@@ -284,4 +277,13 @@ f_tree* make_tree(char *path){//파일 트리만들기
 	}
 	return head;
 }
-
+void init_daemon(void){
+	pid_t pid;
+	if((pid=fork())<0){
+		fprintf(stderr,"fork error\n");
+		exit(1);
+	}else if(pid!=0){
+		exit(0);
+	}
+	setsid();
+}
