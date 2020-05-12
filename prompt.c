@@ -41,6 +41,8 @@ void prompt(){
 		if(pid !=getpid())
 			break;
 		memset(token,0,MAX_TOKEN);//token을 다시 비워줌
+		/*for(int i=0;i<MAX_TOKEN;i++)
+			memset(token[i],0,MAX_TOKEN);*/
 
 		//프롬프트 모양 : "학번>"문자 출력
 		printf("20182611>");
@@ -83,12 +85,13 @@ void prompt(){
 			}
 			//-i,-r옵션 처리
 			//if(argc==2 || argc==3 || argc==4){//delete뒤에 옵션없이  파일이름만 붙을경우
+			if(argc>2){
 			if(!strcmp(token[2],"-i") || !strcmp(token[4],"-i")){
 				iOption=1;
 			}
 			else if((strcmp(token[2],"-r")==0) || (strcmp(token[4],"-r"))==0){
 				rOption=1;
-			}
+			}}
 
 			doDelete(token);
 			check_info();//info 디렉토리의 사이즈 체크
@@ -112,8 +115,10 @@ void prompt(){
 				fprintf(stderr,"wrong input\n");
 				continue;
 			}
-			if(!strcmp(token[2],"-l"))
+			if(!strcmp(token[2],"-l")){
 				lOption=1;
+				printf("loption입력\n");
+			}
 			char fname[BUFFER_SIZE];
 			strcpy(fname,token[1]);
 
@@ -121,11 +126,11 @@ void prompt(){
 			sprintf(tpath,"%s/%s/%s",path,"trash/infos",fname);
 			printf("%s\n",tpath);
 			if(access(tpath,F_OK)<0){
-				fprintf(stderr,"filename(%s) not existed!\n",fname);
+				fprintf(stderr,"There is no '%s' in the 'trash' directory!\n",fname);
 				continue;
 			}
 					
-			restore_file(fname);
+			recover_file(fname);
 			
 			continue;
 		}
@@ -288,10 +293,12 @@ void doDelete(char *token[20]){
 }
 void move_trash(char *path, int t){
 	char c;
+	
 	sleep(t);
+	
 	if(rOption==1){
 		printf("Delete [y/n]? ");
-		c=getchar();
+		c=fgetc(stdin);
 		if(c=='y')
 			move_file(path);
 			//파일 delete
@@ -321,9 +328,12 @@ void move_file(char *fpath){
 	//printf("%s",fname);//확인용
 	sprintf(files,"%s/%s",path,"trash/files");
 	sprintf(infos,"%s/%s",path,"trash/infos");
-	printf("orig: %s\n",orig);
-	printf("files : %s\n",files);
+	//printf("orig: %s\n",orig);
+	//printf("files : %s\n",files);
+	printf("fname : %s\n",fname);
+
 	sprintf(tmp,"%s/%s",files,fname);
+	
 	rename(orig,tmp);//trash/files로 해당 파일 이동
 	t=time(NULL);//t : 삭제 시간
 	tm=*localtime(&t);
@@ -341,7 +351,39 @@ void move_file(char *fpath){
 	fprintf(fp,"%s\n",dform);
 	fprintf(fp,"%s\n",mform);
 	fclose(fp);
+	
+	isoverlap(fname);//중복검사 후 파일이름 변경
 	chdir(check_path);
+}
+void isoverlap(char *fname){
+	/*
+	int count,idx=1;
+	struct dirent **namelist;
+	char trashdir[BUFFER_SIZE],t_info[BUFFER_SIZE],t_file[BUFFER_SIZE];
+	char filepath[BUFFER_SIZE],infopath[BUFFER_SIZE],tmp[BUFFER_SIZE];
+	sprintf(trashdir,"%s/%s",path,"trash");
+
+	sprintf(t_info,"%s/%s",trashdir,"infos");
+	sprintf(t_file,"%s/%s",trashdir,"files");
+	chdir(t_info);//info파일로 이동
+	count=scandir(t_info,&namelist,NULL,alphasort);//디렉토리 파일 읽음
+	for(int i=0;i<count;i++){
+		if(!strcmp(namelist[i]->d_name,".") || !strcmp(namelist[i]->d_name,".."))
+			continue;
+		//중복된 파일을 찾음
+		if(strcmp(namelist[i]->d_name,fname)==0){
+			//files파일변경
+			sprintf(tmp,"%s/%d_%s",t_file,idx,fname);
+			sprintf(filepath,"%s/%s",t_file,fname);
+			rename(filepath,tmp);
+			sprintf(tmp,"%s/%d_%s",t_info,idx,fname);
+			sprintf(infopath,"%s/%s",t_info,fname);
+			rename(infopath,tmp);
+			idx++;
+			//infos파일변경		
+		}
+	}*/
+
 }
 void remove_directory(const char *tpath){
 	DIR *dp;
@@ -497,12 +539,131 @@ void arrange_trash(struct dirent **namelist,int count){
 	chdir(file_path);
 	remove(oldfile);//file_path에서 가장 오래된 파일 삭제
 
-}/*
-void recover_trash(char *fname){
-	char tpath[BUFFER_SIZE],info_path[BUFFER_SIZE],file_path[BUFFER_SIZE];
-
-	sprintf(tpath,"%s/%s/%s/%s",path,"trash");
-	//sprintf(file_path,"%s/%s",tpath,"files");
-	//sprintf(info_path,"%s/%s",tpath,"infos");
 }
-*/
+void recover_file(char *fname){
+	char tmp[BUFFER_SIZE],infofile[BUFFER_SIZE],fpath[BUFFER_SIZE],cpath[BUFFER_SIZE],info_path[BUFFER_SIZE],file_path[BUFFER_SIZE],overname[BUFFER_SIZE];
+	struct dirent **namelist;
+	struct stat statbuf;
+	//struct dirent *tmp;
+	char name[20],*str,dirpath[BUFFER_SIZE];
+	int count,num=0,cnt=0;
+	int idx=1;//복원시 중복파일 처리를 위한 인덱스
+	FILE *fp;
+	//time_t mtime[]
+	char **D,**M;
+
+	sprintf(file_path,"%s/%s",path,"trash/files");
+	sprintf(info_path,"%s/%s",path,"trash/infos");
+	chdir(info_path);
+	
+	count=scandir(info_path,&namelist,NULL,alphasort);
+	time_t mtime[count];
+	D=malloc(sizeof(char*)*count);
+	M=malloc(sizeof(char*)*count);
+	for(int i=0;i<count;i++){
+		D[i]=malloc(sizeof(char)*BUFFER_SIZE);
+		M[i]=malloc(sizeof(char)*BUFFER_SIZE);
+	}
+	for(int i=0;i<count;i++){
+		if(!strcmp(namelist[i]->d_name,".") || !strcmp(namelist[i]->d_name,".."))
+			continue;
+		if((fp=fopen(namelist[i]->d_name,"r"))==NULL){
+			fprintf(stderr,"fopen error for %s\n",namelist[i]->d_name);
+			return;
+		}
+		stat(namelist[i]->d_name,&statbuf);
+		mtime[i]=statbuf.st_mtime;
+		//infos에 있는 내용 읽어오는 부분
+		fscanf(fp,"%s\n",tmp);//첫째 줄 버림
+		fscanf(fp,"%s\n",tmp);//둘째 줄 버림
+		fscanf(fp,"%s\n",tmp);
+
+		fread(D[num],23,1,fp);//삭제시간 받아옴		
+		fgetc(fp);//개행문제 버림
+		fread(M[num],23,1,fp);//삭제시간 받아옴
+	
+		
+		num++;
+	}
+	
+	if(lOption==1){
+		//printf("l옵션 실행중");
+		lOption=0;
+		int i,j;
+		time_t t_tmp;
+		struct dirent *d_tmp;
+		char *d;
+		d=malloc(sizeof(char)*count);
+		printf("%d\n",count);
+		for(i=0;i<count;i++){//수정시간 순으로 정렬
+			if(!strcmp(namelist[i]->d_name, ".") || !strcmp(namelist[i]->d_name, "..")){
+				continue;
+			}
+
+			for(j=i+1;j<count;j++){
+				if(mtime[i]>mtime[j]){
+					t_tmp=mtime[j];
+					mtime[j]=mtime[i];
+					mtime[i]=t_tmp;
+					d_tmp=namelist[i];
+					namelist[i]=namelist[j];
+					namelist[j]=d_tmp;
+				}
+			}
+		}
+		for(i=0;i<count;i++){
+			if(!strcmp(namelist[i]->d_name, ".") || !strcmp(namelist[i]->d_name, ".."))
+				continue;
+
+			fp=fopen(namelist[i]->d_name,"r");
+			fread(tmp,13,1,fp);
+			fscanf(fp,"%s\n",tmp);
+			fgetc(fp);
+			fread(d,23,1,fp);//삭제시간 받아옴		
+			printf("%d. %s		%s",cnt++,namelist[i]->d_name,d);
+		}
+
+
+	}
+	for(int i=0;i<count;i++){
+		//복원하고자 하는 파일의 이름 탐색
+		if(strcmp(namelist[i]->d_name,fname)==0){
+			cnt++;
+			chdir(info_path);
+			sprintf(infofile,"%s/%s",info_path,namelist[i]->d_name);
+			fp=fopen(namelist[i]->d_name,"r");
+			//읽기 권한으로 파일 오픈(위에서 이미 검사했으므로 오픈에러처리는 안해도 됨)
+			fread(tmp,13,1,fp);//첫째 줄 버림
+
+			//복원할 파일의 위치를 받아오고, 동일 위치에 파일이 있는지 확인
+			fscanf(fp,"%s\n",cpath);
+			strcpy(name,namelist[i]->d_name);
+		 	sprintf(tmp,"%s/%s",file_path,name);
+			if(access(cpath,F_OK)==0){
+				//이미 파일이 존재한다면 파일 이름의 처음에 "숫자_"를 추가
+				sprintf(overname,"%d_%s",idx++,name);
+				//files에 있는 파일을 그대로 check 디렉토리로 옮김
+				printf("중복파일 이름 : %s\n",overname);
+				strcpy(name,overname);
+			}
+			
+			remove(infofile);
+			chdir(file_path);
+
+			sprintf(fpath,"%s/%s",check_path,name);
+			rename(tmp,fpath);
+
+		}
+		if(cnt>1){
+			char ch;
+			for(int i=0;i<num;i++)
+				printf("%d. %s  %s %s\n",i+1,name,D[i],M[i]);
+			printf("Choose : ");
+			ch=getchar();
+			getchar();
+			
+		}
+	}
+	
+}
+

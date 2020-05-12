@@ -39,12 +39,14 @@ f_tree * make_tree(char *path);//학번디렉토리안의 파일들을 트리화
 void remove_directory(const char *tpath);
 void init_daemon(void);
 void doDelete(char *token[]);
+void isoverlap(char *fname);
 void prompt(void);
 void print_usage(void);
 void print_tree(f_tree *head,int depth);
 void check_info(void);//info 디렉토리의 크기 측정
 void arrange_trash(struct dirent **namelist,int count);//trash 디렉토리 재정리[2KB에 맞춰서]
-void restore_file(char *fname);
+void recover_file(char *fname);
+
 
 void write_log(int num);
 int w_createlist(f_tree *tree,int state,int index);
