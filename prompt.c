@@ -122,7 +122,7 @@ void prompt(){
 
 			//함수에 들어가기 전 파일 존재여부 확인
 			sprintf(tpath,"%s/%s/%s",path,"trash/infos",fname);
-			printf("%s\n",tpath);
+	//		printf("%s\n",tpath);
 			if(access(tpath,F_OK)<0){
 				fprintf(stderr,"There is no '%s' in the 'trash' directory!\n",fname);
 				continue;
@@ -503,6 +503,7 @@ void arrange_trash(struct dirent **namelist,int count){
 	remove(oldfile);//file_path에서 가장 오래된 파일 삭제
 
 }
+/*
 void recover_file(char *fname){
 	char tmp[BUFFER_SIZE],cpath[BUFFER_SIZE],info_path[BUFFER_SIZE],file_path[BUFFER_SIZE];
 	struct dirent **namelist;
@@ -559,4 +560,131 @@ void recover_file(char *fname){
 	}
 	
 }
+*/
 
+void recover_file(char *fname){
+	char tmp[BUFFER_SIZE],infofile[BUFFER_SIZE],fpath[BUFFER_SIZE],cpath[BUFFER_SIZE],info_path[BUFFER_SIZE],file_path[BUFFER_SIZE],overname[BUFFER_SIZE];
+	struct dirent **namelist;
+	struct stat statbuf;
+	//struct dirent *tmp;
+	char name[20],*str,dirpath[BUFFER_SIZE];
+	int count,num=0,cnt=0;
+	int idx=1;//복원시 중복파일 처리를 위한 인덱스
+	FILE *fp;
+	//time_t mtime[]
+	char **D,**M;
+
+	sprintf(file_path,"%s/%s",path,"trash/files");
+	sprintf(info_path,"%s/%s",path,"trash/infos");
+	chdir(info_path);
+	
+	count=scandir(info_path,&namelist,NULL,alphasort);
+	time_t mtime[count];
+	D=malloc(sizeof(char*)*count);
+	M=malloc(sizeof(char*)*count);
+	for(int i=0;i<count;i++){
+		D[i]=malloc(sizeof(char)*BUFFER_SIZE);
+		M[i]=malloc(sizeof(char)*BUFFER_SIZE);
+	}
+	for(int i=0;i<count;i++){
+		if(!strcmp(namelist[i]->d_name,".") || !strcmp(namelist[i]->d_name,".."))
+			continue;
+		if((fp=fopen(namelist[i]->d_name,"r"))==NULL){
+			fprintf(stderr,"fopen error for %s\n",namelist[i]->d_name);
+			return;
+		}
+		stat(namelist[i]->d_name,&statbuf);
+		mtime[i]=statbuf.st_mtime;
+		//infos에 있는 내용 읽어오는 부분
+		fread(tmp,13,1,fp);
+		fscanf(fp,"%s\n",tmp);//둘째 줄 버림
+
+		fread(D[num],23,1,fp);//삭제시간 받아옴		
+		fgetc(fp);//개행문제 버림
+		fread(M[num],23,1,fp);//삭제시간 받아옴
+		printf("%s %s %s",namelist[i]->d_name, D[num], M[num]);
+		
+		num++;
+	}
+	
+	if(lOption==1){
+		//printf("l옵션 실행중");
+		lOption=0;
+		int i,j;
+		time_t t_tmp;
+		struct dirent *d_tmp;
+		char *d;
+		d=malloc(sizeof(char)*count);
+		printf("%d\n",count);
+		for(i=0;i<count;i++){//수정시간 순으로 정렬
+			if(!strcmp(namelist[i]->d_name, ".") || !strcmp(namelist[i]->d_name, "..")){
+				continue;
+			}
+
+			for(j=i+1;j<count;j++){
+				if(mtime[i]>mtime[j]){
+					t_tmp=mtime[j];
+					mtime[j]=mtime[i];
+					mtime[i]=t_tmp;
+					d_tmp=namelist[i];
+					namelist[i]=namelist[j];
+					namelist[j]=d_tmp;
+				}
+			}
+		}
+		j=1;
+		for(i=0;i<count;i++){
+			if(!strcmp(namelist[i]->d_name, ".") || !strcmp(namelist[i]->d_name, ".."))
+				continue;
+
+			fp=fopen(namelist[i]->d_name,"r");
+			fread(tmp,13,1,fp);
+			fscanf(fp,"%s\n",tmp);
+			fgetc(fp);
+			fread(d,23,1,fp);//삭제시간 받아옴		
+			printf("%d. %s		%s",j++,namelist[i]->d_name,d);
+		}
+
+
+	}
+	for(int i=0;i<count;i++){
+		//복원하고자 하는 파일의 이름 탐색
+		if(strcmp(namelist[i]->d_name,fname)==0){
+			cnt++;
+			chdir(info_path);
+			sprintf(infofile,"%s/%s",info_path,namelist[i]->d_name);
+			fp=fopen(namelist[i]->d_name,"r");
+			//읽기 권한으로 파일 오픈(위에서 이미 검사했으므로 오픈에러처리는 안해도 됨)
+			fread(tmp,13,1,fp);//첫째 줄 버림
+
+			//복원할 파일의 위치를 받아오고, 동일 위치에 파일이 있는지 확인
+			fscanf(fp,"%s\n",cpath);
+			strcpy(name,namelist[i]->d_name);
+			sprintf(tmp,"%s/%s",file_path,name);
+			if(access(cpath,F_OK)==0){
+				//이미 파일이 존재한다면 파일 이름의 처음에 "숫자_"를 추가
+				sprintf(overname,"%d_%s",idx++,name);
+				//files에 있는 파일을 그대로 check 디렉토리로 옮김
+				printf("중복파일 이름 : %s\n",overname);
+				strcpy(name,overname);
+			}
+			
+			remove(infofile);
+			chdir(file_path);
+
+			sprintf(fpath,"%s/%s",check_path,name);
+			rename(tmp,fpath);
+
+		}
+		if(cnt>1){
+			char ch;
+			for(int i=0;i<num;i++)
+				printf("%d. %s  %s %s\n",i+1,name,D[i],M[i]);
+			printf("Choose : ");
+			ch=getchar();
+			getchar();
+			
+		}
+	}
+	
+}

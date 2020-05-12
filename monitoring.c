@@ -49,10 +49,8 @@ int main(int argc,char *argv[]){
 			continue;
 		}
 
-		printf("%s\n%s\n", cur_tree->fname, cur_tree->fname);
 
 		compare_tree(cur_tree->child,prev_tree->child);//기존, 현재 트리를 비교
-		printf("zzzzzzz5\n");
 
 		num=w_createlist(prev_tree->child,DELETE,0);//f_change 구조체를 채우는 함수(DELETE,CREATE 따로 생성 후 log.txt에 한번에 시간순으로 정렬해서 넣을것임)
 		num=w_createlist(cur_tree->child,CREATE,num);
@@ -69,7 +67,6 @@ int main(int argc,char *argv[]){
 
 		sleep(1);
 	}
-	exit(0);
 }
 void set_daemon_process(void){
 	pid_t pid;
@@ -92,7 +89,6 @@ void write_log(int num){
 	FILE *fp;
 	struct tm t;
 
-	printf("%d\n", num);
 	if((fp=fopen(log_path,"r+"))<0){//log.txt파일 오픈(읽기+쓰기)
 		fprintf(stderr,"file open error\n");
 		exit(1);
@@ -104,7 +100,7 @@ void write_log(int num){
 		strcpy(fname,tmp);//순수 파일이름만을 fname에 집어넣음
 		t=*localtime(&f_change[i].time);
 		sprintf(timeform,"%.4d-%02d-%02d %02d:%02d:%02d",t.tm_year+1900,t.tm_mon+1,t.tm_mday,t.tm_hour,t.tm_min,t.tm_sec);
-		printf("%s %d %s\n", timeform, f_change[i].state, fname);
+		//printf("%s %d %s\n", timeform, f_change[i].state, fname);
 
 		switch(f_change[i].state){
 			case MODIFY : 
@@ -180,7 +176,6 @@ int w_createlist(f_tree *tree,int state,int index){//파일상태변경여부를
 
 void compare_tree(f_tree *cur,f_tree *prev){
 	
-	printf("들어왔당\n");
 	while(1){
 		compare_node(cur,prev);//각 노드를 비교
 
@@ -196,8 +191,12 @@ void compare_tree(f_tree *cur,f_tree *prev){
 }
 
 int compare_node(f_tree *cur,f_tree *prev){
-	printf("뒤짐?\n");
+
 	while(1){
+
+		if(cur == NULL)
+			break;
+
 		if(strcmp(cur->fname,prev->fname)==0){//같은 이름을 가진 파일이 있는경우
 			cur->state = CHECKED;
 
@@ -208,13 +207,11 @@ int compare_node(f_tree *cur,f_tree *prev){
 			return 1;
 		}
 
-		if(S_ISDIR(cur->statbuf.st_mode))
-			if(cur->child !=NULL)
-				if(compare_node(cur->child,prev)==1)
-					break;
+		if(cur->child !=NULL)
+			if(compare_node(cur->child,prev)==1)
+				break;
 
-		if(cur->sibling!=NULL)
-			cur=cur->sibling;
+		cur=cur->sibling;
 
 	}
 	return 0;
