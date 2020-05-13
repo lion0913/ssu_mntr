@@ -49,7 +49,6 @@ int main(int argc,char *argv[]){
 			continue;
 		}
 
-
 		compare_tree(cur_tree->child,prev_tree->child);//기존, 현재 트리를 비교
 
 		num=w_createlist(prev_tree->child,DELETE,0);//f_change 구조체를 채우는 함수(DELETE,CREATE 따로 생성 후 log.txt에 한번에 시간순으로 정렬해서 넣을것임)
@@ -224,6 +223,7 @@ f_tree* make_node(void){
 	tmp->child=NULL;
 	tmp->namelist=NULL;
 	tmp->state=N;
+	tmp->size=0;
 	return tmp;
 }
 
@@ -253,6 +253,8 @@ f_tree* make_tree(char *path){//파일 트리만들기
 		stat(tmp,&(new->statbuf));
 		if(S_ISDIR(new->statbuf.st_mode))//파일의 성격이 디렉토리라면 다시 트리를 만듦(재귀)
 			new=make_tree(tmp);
+		else
+			new->size=new->statbuf.st_size;
 		if(isfirst==1){
 			now->child=new;
 			now=now->child;
