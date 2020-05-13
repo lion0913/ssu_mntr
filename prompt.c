@@ -35,15 +35,10 @@ void prompt(){
 		execl("./monitoring","",(char*)0);
 	}
 
-	printf("prompt parent : %d\n", pid);
-
-
 	while(1){
 		if(pid !=getpid())
 			break;
 		memset(token,0,MAX_TOKEN);//token을 다시 비워줌
-		/*for(int i=0;i<MAX_TOKEN;i++)
-		  memset(token[i],0,MAX_TOKEN);*/
 
 		//프롬프트 모양 : "학번>"문자 출력
 		printf("20182611>");
@@ -82,11 +77,10 @@ void prompt(){
 			//입력된 옵션 확인
 			if(strcmp(token[1],"")==0){
 				fprintf(stderr,"input FILENAME\n");
-				exit(1);
+				continue;
 			}
 
 			//-i,-r옵션 처리
-			//if(argc==2 || argc==3 || argc==4){//delete뒤에 옵션없이  파일이름만 붙을경우
 			if(argc>2){
 
 				if(!strcmp(token[2],"-i") || !strcmp(token[4],"-i"))
@@ -101,12 +95,11 @@ void prompt(){
 			continue;
 		} else if(strcmp(token[0],"size")==0){
 			int num=1;
-			printf("\nsize 호출\n");
-			chdir(check_path);
+			chdir(path);
 
 			if(access(token[1],F_OK)<0){
 				fprintf(stderr,"access error for %s\n",token[1]);
-				break;
+				continue;
 			} else{
 
 				if(argc==2){
@@ -114,15 +107,16 @@ void prompt(){
 				} else if(!strcmp(token[2],"-d")){
 					dOption=1;
 					num=atoi(token[3]);
-					printf("num : %d\n",num);
+				//	printf("num : %d\n",num);
 				}
 				realpath(token[1],spath);
 				printf("%s\n",spath);
 				if(strstr(spath,check_path)==NULL) {//해당 경로가 체크디렉토리에 없다면 에러처리
 					fprintf(stderr,"file doesn't exist in checkpath\n");
-					break;
+					continue;
 				}
 				head=make_tree(spath);
+				//printf("%s",spath);
 				print_size(head,spath,num,1);
 				//free_tree(head);
 				continue;
@@ -157,12 +151,13 @@ void prompt(){
 			continue;
 
 		} else if(strcmp(token[0],"tree")==0){
+			//free_tree(head);
 
 			head=make_tree(check_path);//check 디렉토리 파일 목록 트리 생성
 			printf("check\n");
 			//생성한 트리를 출력 
 			print_tree(head->child,1);//check 디렉토리의 첫째부터 차례로 출력,1: 트리의 깊이
-			free_tree(head);
+			//free_tree(head);
 			printf("\n");
 			continue;
 
@@ -184,7 +179,6 @@ void prompt(){
 
 void print_size(f_tree *head,char *spath,int n,int swit){
 	char *rpath;
-	//printf("?\n");
 	while(n>0){
 		if(head==NULL) break;
 			//현재경로로부터 상대경로를 추출해서 rpath에 저장
@@ -198,13 +192,6 @@ void print_size(f_tree *head,char *spath,int n,int swit){
 			else break;
 		}
 		swit=0;
-		/*
-		   print_size(head->child,spath,n-1,1);
-		   swit=0;
-		   }
-		   else
-		   print_size(head->child,spath,n,0);
-		   }*/
 		if(head->child !=NULL)
 			print_size(head->child,spath,n-1,swit);
 		head=head->sibling;
@@ -257,7 +244,7 @@ void doDelete(char *token[20]){
 	struct stat statbuf;//delete
 	int endOption=0;
 	char fname[BUFFER_SIZE];
-	char trash_path[BUFFER_SIZE];
+	char trash_path[BUFFER_SIZE],dpath[BUFFER_SIZE];
 	char *tpath,*tmp;//삭제할 파일의 절대경로
 	struct dirent **namelist;
 	memset(trash_path,0,BUFFER_SIZE);
@@ -276,13 +263,16 @@ void doDelete(char *token[20]){
 	while((tmp=strtok(NULL,"/"))!=NULL)
 		strcpy(fname,tmp);
 	cnt=scandir(check_path,&namelist,NULL,alphasort);//check디렉토리에 존재하는 파일 조회
-	for(i=0;i<cnt;i++){//삭제 파일이 check디렉토리에 있는지 검사
-		if(strcmp(namelist[i]->d_name,fname)==0)
-			break;
+	if(access(tpath,F_OK)<0){
+		fprintf(stderr,"access error\n");
+		return;
 	}
-	if(i==cnt){
-		fprintf(stderr,"%s doesn't exist in check_dir\n",fname);
-		exit(1);
+	else{
+		if(strstr(tpath,check_path)==NULL){
+			fprintf(stderr,"%s is not located under check dir\n",token[1]);
+			return;
+			//exit(1);
+		}
 	}
 	//삭제한 파일은 제출할 소스코드 디렉토리 밑에 있는 "trash"디렉토리로 이동
 	chdir(path);
@@ -504,7 +494,7 @@ void check_info(void){
 	//arrange_trash에서 삭제된 이후에도 2KB가 넘을 수 있기 때문에 while문을 돌려 
 	//크기 체크를 해주면서 반복해야함
 	while(1){
-		amount=9;
+		amount=0;
 		count=scandir(info_path,&namelist,NULL,alphasort);
 		for(int i=0;i<count;i++){
 			if(!strcmp(namelist[i]->d_name,".") || !strcmp(namelist[i]->d_name,".."))
@@ -512,8 +502,9 @@ void check_info(void){
 			stat(namelist[i]->d_name,&statbuf);
 			amount+=statbuf.st_size;
 		}
-
-		if(amount>1000){
+//	printf("amount : %d\n",amount);
+	
+		if(amount>300){
 			//trash디렉토리 재정리해줘야됨
 			arrange_trash(namelist,count);
 		}
@@ -522,7 +513,7 @@ void check_info(void){
 			free(namelist[i]);
 		free(namelist);
 	}
-	//	printf("trash size : %d\n",amount);
+		//printf("trash size : %d\n",amount);
 
 }
 void arrange_trash(struct dirent **namelist,int count){
@@ -531,6 +522,7 @@ void arrange_trash(struct dirent **namelist,int count){
 	time_t oldtime=-1;
 	char oldfile[BUFFER_SIZE];
 	int isFirst=1;
+	int amount=0;
 	sprintf(info_path,"%s/%s",path,"trash/infos");
 	sprintf(file_path,"%s/%s",path,"trash/files");
 	chdir(info_path);
@@ -539,6 +531,7 @@ void arrange_trash(struct dirent **namelist,int count){
 		if(!strcmp(namelist[i]->d_name,".") || !strcmp(namelist[i]->d_name,".."))
 			continue;
 		stat(namelist[i]->d_name,&statbuf);
+		amount+=statbuf.st_size;
 		if(isFirst==1){
 			oldtime=statbuf.st_mtime;
 			strcpy(oldfile,namelist[i]->d_name);
@@ -554,7 +547,7 @@ void arrange_trash(struct dirent **namelist,int count){
 	remove(oldfile); //info_path에서 가장 오래된 파일 삭제
 	chdir(file_path);
 	remove(oldfile);//file_path에서 가장 오래된 파일 삭제
-
+	printf("info 메모리가 2KB를 초과해 %s를 삭제하였습니다.\n",oldfile);
 }
 
 
@@ -562,7 +555,7 @@ void recover_file(char *fname){
 	char tmp[BUFFER_SIZE],infofile[BUFFER_SIZE],fpath[BUFFER_SIZE],cpath[BUFFER_SIZE],info_path[BUFFER_SIZE],file_path[BUFFER_SIZE],overname[BUFFER_SIZE];
 	struct dirent **namelist;
 	struct stat statbuf;
-	char name[20],*str,dirpath[BUFFER_SIZE];
+	char name[20],*str,dirpath[BUFFER_SIZE],parent[BUFFER_SIZE];
 	int count,num=0,cnt=0;
 	int idx=1;//복원시 중복파일 처리를 위한 인덱스
 	FILE *fp;
@@ -653,19 +646,24 @@ void recover_file(char *fname){
 
 			//복원할 파일의 위치를 받아오고, 동일 위치에 파일이 있는지 확인
 			fscanf(fp,"%s\n",cpath);
+			char parent[BUFFER_SIZE];
+			memset(parent,0,BUFFER_SIZE);
+			strncpy(parent,cpath,strlen(cpath)-strlen(namelist[i]->d_name));
 			strcpy(name,namelist[i]->d_name);
+
 			sprintf(tmp,"%s/%s",file_path,name);
 			if(access(cpath,F_OK)==0){
 				//이미 파일이 존재한다면 파일 이름의 처음에 "숫자_"를 추가
-				sprintf(overname,"%d_%s",idx++,name);
+				sprintf(overname,"%d_%s",idx,name);
+				idx++;
+				printf("overname : %s\n",overname);
 				//files에 있는 파일을 그대로 check 디렉토리로 옮김
 				strcpy(name,overname);
 			}
 
 			remove(infofile);
 			chdir(file_path);
-
-			sprintf(fpath,"%s/%s",check_path,name);
+			sprintf(fpath,"%s%s",parent,name);
 			rename(tmp,fpath);
 
 		}
@@ -676,7 +674,7 @@ void recover_file(char *fname){
 			printf("Choose : ");
 			ch=getchar();
 			getchar();
-
+			num=ch-48;
 		}
 	}
 
