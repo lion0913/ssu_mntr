@@ -462,11 +462,16 @@ f_tree* make_tree(char *path){//파일 트리만들기
 		}
 
 	}
-	head->size=make_size(head->child);
+	head->size=make_size(head);
 	return head;
 }
 int make_size(f_tree *head){
 	int size=0;
+	//찾고자 하는 노드가 디렉토리라면 
+	if(S_ISDIR(head->statbuf.st_mode))
+		head=head->child;
+	else 
+		return head->statbuf.st_size;
 	while(head!=NULL){
 		size+=head->size;
 		head=head->sibling;
@@ -490,20 +495,20 @@ void check_info(void){
 	int amount,count;
 	f_tree *head;
 	sprintf(info_path,"%s/%s",path,"trash/infos");
-	chdir(info_path);
+
 	//arrange_trash에서 삭제된 이후에도 2KB가 넘을 수 있기 때문에 while문을 돌려 
 	//크기 체크를 해주면서 반복해야함
 	while(1){
+		chdir(info_path);
 		amount=0;
 		count=scandir(info_path,&namelist,NULL,alphasort);
 		for(int i=0;i<count;i++){
 			if(!strcmp(namelist[i]->d_name,".") || !strcmp(namelist[i]->d_name,".."))
 				continue;
-			stat(namelist[i]->d_name,&statbuf);
+			stat(namelist[i]->d_name,&statbuf); 
 			amount+=statbuf.st_size;
 		}
-//	printf("amount : %d\n",amount);
-	
+
 		if(amount>300){
 			//trash디렉토리 재정리해줘야됨
 			arrange_trash(namelist,count);
@@ -513,7 +518,6 @@ void check_info(void){
 			free(namelist[i]);
 		free(namelist);
 	}
-		//printf("trash size : %d\n",amount);
 
 }
 void arrange_trash(struct dirent **namelist,int count){
@@ -522,7 +526,6 @@ void arrange_trash(struct dirent **namelist,int count){
 	time_t oldtime=-1;
 	char oldfile[BUFFER_SIZE];
 	int isFirst=1;
-	int amount=0;
 	sprintf(info_path,"%s/%s",path,"trash/infos");
 	sprintf(file_path,"%s/%s",path,"trash/files");
 	chdir(info_path);
@@ -531,7 +534,6 @@ void arrange_trash(struct dirent **namelist,int count){
 		if(!strcmp(namelist[i]->d_name,".") || !strcmp(namelist[i]->d_name,".."))
 			continue;
 		stat(namelist[i]->d_name,&statbuf);
-		amount+=statbuf.st_size;
 		if(isFirst==1){
 			oldtime=statbuf.st_mtime;
 			strcpy(oldfile,namelist[i]->d_name);
@@ -539,7 +541,6 @@ void arrange_trash(struct dirent **namelist,int count){
 		}
 		if(oldtime>statbuf.st_mtime){
 			strcpy(oldfile,namelist[i]->d_name);
-			//printf("%s\n",oldfile);
 			oldtime=statbuf.st_mtime;
 		}
 

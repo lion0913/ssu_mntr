@@ -15,10 +15,8 @@ void set_daemon_process(void);
 int main(int argc,char *argv[]){
 	FILE *fp;
 	char pwd[BUFFER_SIZE];
-	//char log_path[BUFFER_SIZE];//log.txt의 절대경로
 	set_daemon_process();
 	getcwd(pwd,BUFFER_SIZE);//현재위치
-	//printf("%s\n",pwd);
 	if(access("check",F_OK)!=0){//학번디렉토리의 존재여부 확인
 		fprintf(stderr,"no directory\n");
 		exit(1);//없으면 에러
@@ -59,7 +57,6 @@ int main(int argc,char *argv[]){
 
 		//로그에 기록을 끝낸상태
 		//new_tree를 prev_tree로 옮겨주는 작업수행 (계속 트리를 갱신해주기 위해 필요)
-		//free_tree(prev_tree);
 		prev_tree=cur_tree;
 
 		initstat(prev_tree->child);
@@ -99,7 +96,6 @@ void write_log(int num){
 		strcpy(fname,tmp);//순수 파일이름만을 fname에 집어넣음
 		t=*localtime(&f_change[i].time);
 		sprintf(timeform,"%.4d-%02d-%02d %02d:%02d:%02d",t.tm_year+1900,t.tm_mon+1,t.tm_mday,t.tm_hour,t.tm_min,t.tm_sec);
-		//printf("%s %d %s\n", timeform, f_change[i].state, fname);
 
 		switch(f_change[i].state){
 			case MODIFY : 
@@ -277,6 +273,7 @@ void init_daemon(void){
 	}
 	setsid();
 }
+
 
 void free_tree(f_tree *head)
 {
